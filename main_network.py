@@ -156,6 +156,14 @@ def fetch_season_episodes(series_url, username, password, metube_url, epi_from, 
                     copied_links.append(download_link)
                     break
 
+        print("--------------------------------------")
+        print("--------------------------------------")
+        print("-----Bulk Print for easy copy---------")
+        for (i, link) in enumerate(copied_links):
+            print(link)
+        print("--------------------------------------")
+        print("--------------------------------------")
+
         if metube_url:
             send_to_metube(metube_url, copied_links)
     finally:
