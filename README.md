@@ -1,4 +1,5 @@
 # Strenio-Download [Alpha]
+[![Docker Image CI](https://github.com/sudhirnakka-dev/stremio-download/actions/workflows/docker-image.yml/badge.svg)](https://github.com/sudhirnakka-dev/stremio-download/actions/workflows/docker-image.yml)
 
 ## Table of Contents
 - [Introduction](#introduction)
