@@ -78,7 +78,7 @@ def fetch_season_episodes(series_url, username, password, epi_from, epi_to, seas
         stremio_auth(username, password, driver)
         navigate_series(driver, series_url)
         seasons = get_number_of_seasons(driver)
-        season_to_get = season if len(seasons) > 1 and season else None
+        season_to_get = season if len(seasons) >= 1 and season else None
         navigate_season(driver, series_url, season_to_get)
         number_of_episodes = get_number_of_episodes(driver)
         path_param, season_number = extract_parameters(series_url)
@@ -116,7 +116,7 @@ def fetch_season_episodes(series_url, username, password, epi_from, epi_to, seas
                             download_link = stream['url']
                             break
                 if download_link:
-                    print(f"Grabbed Link: {download_link}")
+                    # print(f"Grabbed Link: {download_link}")
                     copied_links.append(download_link)
                     break
     finally:
@@ -223,6 +223,24 @@ if __name__ == '__main__':
     season = os.getenv('SEASON', 1)
     is_rd = os.getenv('IS_RD', None)
     name_contains = os.getenv('NAME_CONTAINS', None)
+
+    if not username or not password or not series_url:
+        print("Mandatory env values: username, password, series url. Please check if they are provided")
+        exit(2)
+
+    if epi_to == "": epi_to = None
+    if epi_from == "": epi_from = None
+    if season == "": season = 1
+    if is_rd == "": is_rd = bool("true")
+    if name_contains == "": name_contains = None
+
+    if epi_to: epi_to = int(epi_to)
+    if epi_from: epi_from = int(epi_from)
+    if season: season = int(season)
+    if is_rd: is_rd = bool(is_rd)
+    if name_contains: name_contains = str(name_contains)
+    if epi_to and epi_from and epi_to < epi_from:
+        print("From episode number is greater than to episode number. Please check if they are provided")
 
     copied_links = fetch_season_episodes(
         series_url,
