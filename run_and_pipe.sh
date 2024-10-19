@@ -43,9 +43,9 @@ extract_and_process_bulk_print() {
 
 # Run the docker command and process URLs for MeTube
 log=$(docker run -it --rm \
-  --env USERNAME="sidigrid@gmail.com" \
-  --env PASSWORD="tonyigrid@7" \
-  --env SERIES_URL="https://web.stremio.com/#/detail/series/tt0012349" \
+  --env USERNAME="USERNAME" \
+  --env PASSWORD="PASSWORD" \
+  --env SERIES_URL="https://web.stremio.com/#/detail/series/tt1112349" \
   --env FROM="10" \
   --env TO="12" \
   --env SEASON="1" \
