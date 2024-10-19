@@ -15,4 +15,4 @@ docker run -it --rm \
 --env TO="20" \
 --env IS_RD="true" \
 --env NAME_CONTAINS="Judas" \
-stremio-download:0.0.2
+sudhirnakka07/stremio-download:0.0.2
