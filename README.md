@@ -37,11 +37,6 @@ This script automates grabbing these downloadable URL's from stremio.
 ![img_2.png](img_2.png)
 
 
-## Features
-- Feature 1
-- Feature 2
-- Feature 3
-
 ```bash
 # Clone the repository
 git clone https://github.com/your-username/your-project-name.git
@@ -57,34 +52,35 @@ pip install -r requirements.txt
 ```
 
 ## Usage
-* Create or modify the config.ini file with your details
-```ini
-[DEFAULT]
-username = STREMIO_USERNAME
-password = STREMIO_PASSWORD
+The script reads required parameters from environment variables, which simplifies configuring and executing it multiple times.
 
-; series to download (browse to the show on stremio, copy browser url or click share and copy it)
-series_url = https://web.stremio.com/#/detail/series/tt0988818
-; season to download
-season = 1
-; download only if RD+ resource. Comment if not required
-is_rd = RD+
-; grab the link if title contains this text - picks 1st entry if not provided
-title_contains = Judas
-; If you have a metube running, this script can send the links to your metube for automated download
-; metube_url = http://10.0.0.46:9582/add
+Multiple ways to run:
+1. Python file directly
+   2. After cloning the codebase, run npm install -r requirements.txt to install the required dependencies
+   3. Modify the values in run.sh script and execute it
+   ```bash
+   ./run.sh 
+   ```
+2. Docker - locally
+   1. Build a local docker image by using build-docker.sh script
+   2. Modify values in run-docker.sh and execute it
+   ```bash
+   ./run-docker.sh
+   ```
 
-; Choose show episodes from, to. Optional if you want to grab all possible entries in a season
-from = 1
-to = 10 
-```
-* If you have built the docker image already, you can run start a run with this
+
+### Send to a Downloader
+The above executions will fetch the downloadable links and will print them to console.
+An additional step that can automate the flow would be to send these links to a downloader.
+
+run_and_pipe.sh will give you an idea of what can be done. In the script, the downloadable links are sent
+to metube url. The metube part can be replaced with any downloader - aria2, cloud downloaders etc..
 ```bash
-docker run -it --rm --network=host \
-    -v /path_to_your/config.ini:/app/config.ini \
-    stremio-download:latest
+./run_and_pipe.sh
 ```
+ 
 
+### General flow within the script
 The above will perform the following:
 * It will login into stremio using your provided credentials (it all happens on your local machine)
 * Navigates to the configured url, 
