@@ -1,6 +1,7 @@
 import argparse
 import configparser
 import time
+import os  # Importing os module
 from urllib.parse import urlparse, parse_qs
 import requests
 from selenium.webdriver.chrome.options import Options
@@ -14,42 +15,36 @@ import json
 
 def wait(seconds):
     """
-    Pause execution for the given number of seconds.
-
-    :param seconds: Number of seconds to pause.
+    :param seconds: The number of seconds for the function to pause execution.
+    :return: None
     """
     time.sleep(seconds)
 
 
 def extract_parameters(url):
     """
-    Extract path and query parameters from a URL.
-
-    :param url: The URL to extract parameters from.
-    :return: Tuple containing path parameter and query parameter.
+    :param url: The URL containing the fragment to be parsed.
+    :return: A tuple containing path_parameter and query_parameter.
     """
     parsed_url = urlparse(url)
     fragment = parsed_url.fragment
     fragment_url = urlparse(fragment)
     path = fragment_url.path
     query = fragment_url.query
-
     path_parts = path.split('/')
     path_parameter = path_parts[path_parts.index('series') + 1] if 'series' in path_parts and (
             path_parts.index('series') + 1) < len(path_parts) else None
     query_params = parse_qs(query)
     query_parameter = query_params.get('season', [None])[0]
-
     return path_parameter, query_parameter
 
 
 def stremio_auth(username, password, driver):
     """
-    Authenticate to Stremio via the web interface.
-
-    :param username: Username for Stremio.
-    :param password: Password for Stremio.
-    :param driver: Selenium WebDriver instance.
+    :param username: The username of the Stremio account.
+    :param password: The password of the Stremio account.
+    :param driver: The Selenium WebDriver instance used for automating browser actions.
+    :return: None
     """
     login_url = "https://web.stremio.com/#/intro?form=login"
     driver.get(login_url)
@@ -63,84 +58,53 @@ def stremio_auth(username, password, driver):
     WebDriverWait(driver, 10).until(EC.url_changes(login_url))
 
 
-def send_to_metube(metube_url, copied_links):
+
+def fetch_season_episodes(series_url, username, password, epi_from, epi_to, season, is_rd, name_contains):
     """
-    Send the collected streaming links to Metube.
-
-    :param metube_url: URL of the Metube service.
-    :param copied_links: List of streaming links to send.
-    """
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0',
-        'Accept': 'application/json, text/plain, */*',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'Accept-Encoding': 'gzip, deflate',
-        'Content-Type': 'application/json',
-        'Connection': 'keep-alive',
-        'Cookie': 'metube_theme=auto',
-        'Priority': 'u=0',
-        'Pragma': 'no-cache',
-        'Cache-Control': 'no-cache'
-    }
-    print("Sending to Metube...")
-    for i, link in enumerate(copied_links):
-        data = {
-            "url": link,
-            "quality": "best",
-            "format": "any",
-            "auto_start": True
-        }
-        response = requests.post(metube_url, headers=headers, json=data)
-        print(f"Link {i + 1} sent", response.status_code, response.text)
-
-
-def fetch_season_episodes(series_url, username, password, metube_url, epi_from, epi_to, season):
-    """
-    Fetch episodes from a specific season of a series.
-
-    :param series_url: URL of the series.
-    :param username: Username for Stremio authentication.
-    :param password: Password for Stremio authentication.
-    :param metube_url: URL of the Metube service to which links are sent.
+    :param series_url: URL of the series page to fetch episodes from.
+    :param username: Username for authentication.
+    :param password: Password for authentication.
     :param epi_from: Starting episode number to fetch.
     :param epi_to: Ending episode number to fetch.
     :param season: Specific season number to fetch episodes from.
-    :return: List of copied episode streaming links.
+    :param is_rd: Flag to filter streams for RD+.
+    :param name_contains: String to filter stream names containing this substring.
+    :return: List of direct links to the fetched episodes.
     """
     driver = create_get_driver()
     try:
+        print("Processing...")
         series_url = series_url.split("?")[0]
         stremio_auth(username, password, driver)
         navigate_series(driver, series_url)
         seasons = get_number_of_seasons(driver)
         season_to_get = season if len(seasons) > 1 and season else None
-        season_url = f"{series_url}?season={season_to_get}" if season_to_get else series_url
-        navigate_season(driver, season_url)
+        navigate_season(driver, series_url, season_to_get)
         number_of_episodes = get_number_of_episodes(driver)
         path_param, season_number = extract_parameters(series_url)
-
         print(f"Content code detected: {path_param}")
         series_url_without_season = series_url.split("?")[0]
         copied_links = []
-
         if not epi_from:
             epi_from = 1
         if not epi_to:
             epi_to = number_of_episodes + 1
-
-        for i in range(epi_from, epi_to):
+        for i in range(int(epi_from), int(epi_to + 1)):
             tmp_series_url = f"{series_url_without_season}/{path_param}:{season_to_get}:{i}" if season_to_get else f"{series_url_without_season}/{path_param}:{i}"
             del driver.requests
-            wait(2)
-
-            print(f"Fetching episode: {tmp_series_url}")
+            wait(1)
+            print(f"S{season_to_get}:E{i}", "..")
+            # print(f"Fetching episode: {tmp_series_url}")
             driver.get(tmp_series_url)
-
             WebDriverWait(driver, 30).until(
                 EC.presence_of_all_elements_located((By.CSS_SELECTOR, "a.label-container-iBMb9")))
-            stream_is_rd = "RD+"
-            stream_name_contains = "Judas"
-
+            wait(2)
+            stream_is_rd = None
+            stream_name_contains = None
+            if is_rd:
+                stream_is_rd = "RD+"
+            if name_contains:
+                stream_name_contains = name_contains
             for request in driver.requests:
                 download_link = None
                 if "qualityfilter=" in request.url and request.response.status_code == 200:
@@ -155,27 +119,15 @@ def fetch_season_episodes(series_url, username, password, metube_url, epi_from, 
                     print(f"Grabbed Link: {download_link}")
                     copied_links.append(download_link)
                     break
-
-        print("--------------------------------------")
-        print("--------------------------------------")
-        print("-----Bulk Print for easy copy---------")
-        for (i, link) in enumerate(copied_links):
-            print(link)
-        print("--------------------------------------")
-        print("--------------------------------------")
-
-        if metube_url:
-            send_to_metube(metube_url, copied_links)
     finally:
         driver.quit()
+    return copied_links
 
 
 def get_number_of_seasons(driver):
     """
-    Get the number of seasons available for the series.
-
-    :param driver: Selenium WebDriver instance.
-    :return: List of season elements.
+    :param driver: WebDriver instance used to interact with the browser.
+    :return: List of WebElements representing the number of seasons.
     """
     WebDriverWait(driver, 30).until(
         EC.presence_of_all_elements_located((By.CSS_SELECTOR, "div.seasons-popup-label-container-fZcu4")))
@@ -185,44 +137,48 @@ def get_number_of_seasons(driver):
 
 def get_number_of_episodes(driver):
     """
-    Get the number of episodes available for the selected season.
-
-    :param driver: Selenium WebDriver instance.
-    :return: Number of episodes.
+    :param driver: The web driver instance used to interact with the web page.
+    :return: The number of unique episodes detected on the page.
     """
     video_containers = driver.find_elements(By.CSS_SELECTOR, "div.label-container-iBMb9")
-    number_of_episodes = len(video_containers)
-    print(f"Detected {number_of_episodes} episodes")
-    return number_of_episodes
+    unique_episodes = []
+    for (container_index, container) in enumerate(video_containers):
+        if not container.text == "":
+            unique_episodes.append(container)
+    print(f"Detected {len(unique_episodes)} episodes")
+    return len(unique_episodes)
 
 
 def navigate_series(driver, series_url):
     """
-    Navigate to the series page.
-
-    :param driver: Selenium WebDriver instance.
-    :param series_url: URL of the series.
+    :param driver: The Selenium WebDriver instance used to navigate the browser.
+    :param series_url: The URL of the series page to navigate to.
+    :return: None
     """
     driver.get(series_url)
     WebDriverWait(driver, 10).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, "div.label-container-iBMb9")))
 
 
-def navigate_season(driver, url):
+def navigate_season(driver, series_url, season_to_get):
     """
-    Navigate to the specific season page.
-
-    :param driver: Selenium WebDriver instance.
-    :param url: URL of the season page.
+    :param driver: The WebDriver instance used to navigate the web page.
+    :param series_url: The URL of the series page to navigate to.
+    :param season_to_get: The specific season number to navigate, can be None to navigate to the default series page.
+    :return: None
     """
+    print(f"Season: {season_to_get}")
+    url = f"{series_url}?season={season_to_get}" if season_to_get else series_url
     driver.get(url)
     WebDriverWait(driver, 10).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, "div.label-container-iBMb9")))
 
 
 def create_get_driver():
     """
-    Create a Selenium WebDriver instance with specified options.
+    Creates and configures a Chrome WebDriver instance with specific options for a headless, automated browser session.
 
-    :return: Configured Selenium WebDriver instance.
+    The configurations include disabling the GPU, running no sandbox mode, enabling automation, and various other settings to ensure stable headless browser operations and security handling.
+
+    :return: A configured instance of Chrome WebDriver
     """
     chrome_options = Options()
     chrome_options.add_argument("--headless")
@@ -238,29 +194,49 @@ def create_get_driver():
     return webdriver.Chrome(options=chrome_options)
 
 
+def print_for_bash_pipe():
+    global i, link
+    print("--------------------------------------")
+    print("-----Bulk Print for pattern pipe---------")
+    print("-----eg Bash: grep '^$pattern' '$input_file' | sed 's/^$pattern//'---------")
+    for (i, link) in enumerate(copied_links):
+        print(f"@@##@@{link}")
+    print("--------------------------------------")
+
+
+def print_for_easy_copy():
+    global i, link
+    print("--------------------------------------")
+    print("-----Bulk Print for easy copy---------")
+    for (i, link) in enumerate(copied_links):
+        print(f"{link}")
+    print("--------------------------------------")
+
+
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
-    config = configparser.ConfigParser()
-    config.read('config.ini')
-    config_username = config['DEFAULT'].get('username', None)
-    config_password = config['DEFAULT'].get('password', None)
-    config_series_url = config['DEFAULT'].get('series_url', None)
-    config_metube_url = config['DEFAULT'].get('metube_url', None)
-    config_from = config['DEFAULT'].get('from', None)
-    config_to = config['DEFAULT'].get('to', None)
-    config_season = config['DEFAULT'].get('season', 1)
+    username = os.getenv('USERNAME', None)
+    password = os.getenv('PASSWORD', None)
+    series_url = os.getenv('SERIES_URL', None)
+    epi_from = os.getenv('FROM', 1)
+    epi_to = os.getenv('TO', None)
+    season = os.getenv('SEASON', 1)
+    is_rd = os.getenv('IS_RD', None)
+    name_contains = os.getenv('NAME_CONTAINS', None)
 
-    parser = argparse.ArgumentParser(description='Fetch season episodes for a given series.')
-    parser.add_argument('--username', type=str, help='The username for authentication')
-    parser.add_argument('--password', type=str, help='The password for authentication')
-    parser.add_argument('--series_url', type=str, help='The URL of the series')
-    parser.add_argument('--metube_url', type=str, help='Will send download links to Metube if configured')
-    args = parser.parse_args()
+    copied_links = fetch_season_episodes(
+        series_url,
+        username,
+        password,
+        int(epi_from) if epi_from else None,
+        int(epi_to) if epi_to else None,
+        int(season) if season else 1,
+        is_rd,
+        name_contains
+    )
 
-    username = args.username if args.username is not None else config_username
-    password = args.password if args.password is not None else config_password
-    series_url = args.series_url if args.series_url is not None else config_series_url
-    metube_url = args.metube_url if args.metube_url is not None else config_metube_url
+    # print_for_bash_pipe()
+    print_for_easy_copy()
 
-    fetch_season_episodes(series_url, username, password, metube_url, int(config_from), int(config_to),
-                          int(config_season))
+
+

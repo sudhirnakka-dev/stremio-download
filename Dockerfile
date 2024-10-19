@@ -1,10 +1,6 @@
 # Use the official Python image from the Docker Hub
 FROM python:3.11-slim as stage1
 
-# Copy the current directory contents into the container at /app
-WORKDIR /app
-COPY . /app
-
 # Install apt packages
 RUN apt-get update && apt-get install -y \
     wget \
@@ -24,13 +20,19 @@ RUN wget -O /tmp/chromedriver.zip https://storage.googleapis.com/chrome-for-test
     rm /tmp/chromedriver.zip
 
 
-FROM stage1
+FROM stage1 as stage2
 # Install necessary Python packages
+WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+
+FROM stage2
+# Copy the current directory contents into the container at /app
+WORKDIR /app
+COPY . /app
 
 # Make port 80 available to the world outside this container
 EXPOSE 80
 
 # Run main.py when the container launches
-ENTRYPOINT ["python", "/app/main_network.py"]
+ENTRYPOINT ["python", "/app/main_env.py"]
